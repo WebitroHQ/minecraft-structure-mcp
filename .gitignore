@@ -1,5 +1,6 @@
 __pycache__/
 *.egg-info/
 *.nbt
+!examples/*.nbt
 renders/
 .venv/
