@@ -38,7 +38,7 @@ beds, skulls, signs) show as simple placeholder boxes.
 Requires Python 3.10+ and a Minecraft Java client jar on your machine.
 
 ```bash
-git clone https://github.com/SpicesFire/minecraft-structure-mcp
+git clone https://github.com/WebitroHQ/minecraft-structure-mcp
 cd minecraft-structure-mcp
 pip install -e .
 ```
@@ -91,6 +91,10 @@ that version.
 pip install -e . pytest
 pytest
 ```
+
+## Made by
+
+[Webitro](https://webitro.com) — custom software studio from Türkiye.
 
 ## License
 

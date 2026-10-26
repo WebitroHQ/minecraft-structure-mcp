@@ -5,12 +5,12 @@ description = "An MCP server for designing Minecraft structures (structure-block
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
-authors = [{ name = "SpicesFire" }]
+authors = [{ name = "Webitro" }]
 keywords = ["minecraft", "mcp", "model-context-protocol", "claude", "structure", "nbt"]
 dependencies = ["mcp>=2.0", "nbtlib>=2.0", "numpy>=1.24", "pillow>=10.0"]
 
 [project.urls]
-Homepage = "https://github.com/SpicesFire/minecraft-structure-mcp"
+Homepage = "https://github.com/WebitroHQ/minecraft-structure-mcp"
 
 [project.scripts]
 minecraft-structure-mcp = "mcstructure_mcp.server:main"
