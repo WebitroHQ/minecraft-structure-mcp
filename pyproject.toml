@@ -1,6 +1,6 @@
 [project]
 name = "minecraft-structure-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "An MCP server for designing Minecraft structures (structure-block .nbt files) with an AI assistant: build, read back, render, save."
 readme = "README.md"
 license = { text = "MIT" }

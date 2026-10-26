@@ -26,6 +26,7 @@ It handles modded blocks too (point it at a mod's assets). This underground ruin
 | `fill` | fill a box: `replace`, `hollow` (shell + air inside), `outline`, `walls`, `keep` |
 | `replace_blocks`, `copy_region`, `set_block_nbt` (chest contents…), `undo` | editing |
 | `layer_text` | one layer as a character map with a legend — exact and cheap on tokens |
+| `check_walkable` | can a player walk it? stairs (bottom step, head room through the ceiling, top exit) and doors, with coordinates of every problem |
 | `render` | isometric view from any corner; `cut_y` hides everything above a height to look inside |
 | `render_layer` | top-down plan of one layer, with a grid and coordinates |
 

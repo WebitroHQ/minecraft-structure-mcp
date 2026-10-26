@@ -17,6 +17,7 @@ from PIL import Image as PILImage
 from .assets import Assets
 from .render import Renderer
 from .structure import AIR, DATA_VERSIONS, Structure, normalize_state
+from .walkable import check
 
 mcp = MCPServer("minecraft-structure-designer")
 WORKSPACE = Path(os.environ.get("MCSTRUCT_WORKSPACE", Path.home() / "minecraft-structures"))
@@ -234,6 +235,26 @@ def layer_text(name: str, y: int) -> str:
         rows.append(f"{z:3d}  " + "".join(row))
     leg = "\n".join(f"  {c} = {st}" for st, c in legend.items())
     return f"'{name}' y={y} (' ' void, '.' air)\n" + "\n".join(rows) + "\n" + leg
+
+
+@mcp.tool()
+def check_walkable(name: str, x1: int | None = None, y1: int | None = None, z1: int | None = None,
+                   x2: int | None = None, y2: int | None = None, z2: int | None = None,
+                   include_open_sky: bool = False) -> str:
+    """Can a player actually walk it? Checks every stair (something to stand on before the bottom step, head
+    room over each step — the ceiling above must be open — and a floor or the next step at the top) and every
+    door (upper half, floor and head room on both sides). Optional box to check one stairwell. Stairs with
+    nothing above them (roof slopes, outdoor steps) are skipped unless include_open_sky."""
+    s = get(name)
+    box = _box(x1, y1, z1, x2, y2, z2) if x1 is not None else None
+    problems, n = check(s, box, include_open_sky)
+    head = (f"'{name}': checked {n['stairs']} stairs and {n['doors']} doors "
+            f"(skipped {n['open_sky']} open-sky and {n['upside_down']} upside-down stairs).")
+    if not problems:
+        return head + " All walkable."
+    return head + f" {len(problems)} problem(s):
+" + "
+".join(map(str, problems))
 
 
 @mcp.tool()

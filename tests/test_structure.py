@@ -33,3 +33,39 @@ def test_undo():
     s.snapshot()
     s.set(0, 0, 0, "stone")
     assert s.undo() and s.get(0, 0, 0) is None
+
+
+def _stairwell(ceiling_open: bool):
+    """Two floors joined by a 3-step flight going east; the upper floor has a hole over the steps or not."""
+    from mcstructure_mcp.walkable import check
+    s = Structure((8, 7, 3))
+    for x in range(8):
+        for z in range(3):
+            s.set(x, 0, z, "stone")
+            if not (ceiling_open and 1 <= x <= 3):
+                s.set(x, 3, z, "oak_planks")
+            s.set(x, 6, z, "stone")           # roof, so the flight is "covered"
+    for i in range(3):
+        s.set(1 + i, 1 + i, 1, "oak_stairs[facing=east,half=bottom]")
+    return check(s)
+
+
+def test_stairs_walkable():
+    problems, n = _stairwell(ceiling_open=True)
+    assert n["stairs"] == 3 and not problems, problems
+
+
+def test_stairs_hit_ceiling():
+    problems, _ = _stairwell(ceiling_open=False)
+    assert any("head room" in p.text or "blocked right above" in p.text for p in problems)
+
+
+def test_door_needs_upper_half():
+    from mcstructure_mcp.walkable import check
+    s = Structure((3, 3, 3))
+    for x in range(3):
+        for z in range(3):
+            s.set(x, 0, z, "stone")
+    s.set(1, 1, 1, "oak_door[facing=north,half=lower,hinge=left,open=false,powered=false]")
+    problems, n = check(s)
+    assert n["doors"] == 1 and any("upper half" in p.text for p in problems)
