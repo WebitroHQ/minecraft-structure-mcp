@@ -55,6 +55,9 @@ class Structure:
     #: (x, y, z) -> block entity NBT (e.g. chest contents), as an nbtlib Compound.
     block_nbt: dict[tuple[int, int, int], Compound] = field(default_factory=dict)
     entities: list = field(default_factory=list)
+    #: Named boxes ('roof' -> ((x1, y1, z1), (x2, y2, z2)), inclusive) so a part can be edited on its own.
+    #: Saved in the .nbt under a key the game ignores.
+    regions: dict[str, tuple[tuple[int, int, int], tuple[int, int, int]]] = field(default_factory=dict)
     history: list = field(default_factory=list, repr=False)
 
     # ------------------------------------------------------------------ editing
@@ -89,6 +92,17 @@ class Structure:
         self.size = size
         self.blocks = {p: s for p, s in self.blocks.items() if self.inside(*p)}
         self.block_nbt = {p: n for p, n in self.block_nbt.items() if self.inside(*p)}
+        self.regions = {n: (a, tuple(min(v, s - 1) for v, s in zip(b, size)))
+                        for n, (a, b) in self.regions.items() if self.inside(*a)}
+
+    def crop(self, box) -> "Structure":
+        """A copy of just this box (moved to the origin), e.g. to render one region on its own."""
+        (ax, ay, az), (bx, by, bz) = box
+        out = Structure((bx - ax + 1, by - ay + 1, bz - az + 1), self.data_version)
+        for (x, y, z), st in self.blocks.items():
+            if ax <= x <= bx and ay <= y <= by and az <= z <= bz:
+                out.blocks[(x - ax, y - ay, z - az)] = st
+        return out
 
     def counts(self) -> dict[str, int]:
         out: dict[str, int] = {}
@@ -124,6 +138,9 @@ class Structure:
             "blocks": blocks,
             "entities": List[Compound](self.entities),
         })
+        if self.regions:
+            root["mcstructure_regions"] = Compound({n: List[Int]([Int(v) for v in (*a, *b)])
+                                                     for n, (a, b) in self.regions.items()})
         return nbtlib.File(root, gzipped=True)
 
     def save(self, path: str | Path) -> Path:
@@ -149,4 +166,7 @@ class Structure:
             if "nbt" in b:
                 s.block_nbt[pos] = b["nbt"]
         s.entities = list(root.get("entities", []))
+        for n, v in root.get("mcstructure_regions", {}).items():
+            v = [int(i) for i in v]
+            s.regions[str(n)] = (tuple(v[:3]), tuple(v[3:]))
         return s

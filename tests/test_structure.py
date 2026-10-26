@@ -69,3 +69,24 @@ def test_door_needs_upper_half():
     s.set(1, 1, 1, "oak_door[facing=north,half=lower,hinge=left,open=false,powered=false]")
     problems, n = check(s)
     assert n["doors"] == 1 and any("upper half" in p.text for p in problems)
+
+
+def test_regions_saved_and_cropped(tmp_path):
+    s = Structure((5, 5, 5))
+    s.set(1, 4, 1, "oak_stairs[facing=east,half=bottom]")
+    s.set(0, 0, 0, "stone")
+    s.regions["roof"] = ((0, 4, 0), (4, 4, 4))
+    t = Structure.load(s.save(tmp_path / "r.nbt"))
+    assert t.regions["roof"] == ((0, 4, 0), (4, 4, 4))
+    roof = t.crop(t.regions["roof"])
+    assert roof.size == (5, 1, 5) and list(roof.blocks) == [(1, 0, 1)]
+
+
+def test_server_tools_run():
+    """The server module loads and its text tools answer (catches a broken tool before it ships)."""
+    from mcstructure_mcp import server
+    server.STRUCTURES["t"] = Structure((4, 4, 4))
+    server.fill("t", 0, 0, 0, 3, 0, 3, "stone")
+    assert "region 'top'" in server.mark_region("t", "top", 0, 3, 0, 3, 3, 3).lower()
+    assert "All walkable" in server.check_walkable("t", region="top")
+    assert "Cleared" in server.clear_region("t", "top")

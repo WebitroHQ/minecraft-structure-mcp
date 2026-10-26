@@ -27,6 +27,7 @@ It handles modded blocks too (point it at a mod's assets). This underground ruin
 | `replace_blocks`, `copy_region`, `set_block_nbt` (chest contents…), `undo` | editing |
 | `layer_text` | one layer as a character map with a legend — exact and cheap on tokens |
 | `check_walkable` | can a player walk it? stairs (bottom step, head room through the ceiling, top exit) and doors, with coordinates of every problem |
+| `mark_region`, `list_regions`, `clear_region`, `render_region`, `delete_region` | name a part (`roof`, `stairwell`) and fix just that part: look at it alone, clear it, rebuild it — the rest stays as it was. `replace_blocks` and `check_walkable` take a `region` too |
 | `render` | isometric view from any corner; `cut_y` hides everything above a height to look inside |
 | `render_layer` | top-down plan of one layer, with a grid and coordinates |
 

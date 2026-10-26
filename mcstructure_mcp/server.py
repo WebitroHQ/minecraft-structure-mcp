@@ -153,14 +153,14 @@ def fill(name: str, x1: int, y1: int, z1: int, x2: int, y2: int, z2: int, state:
 
 @mcp.tool()
 def replace_blocks(name: str, old: str, new: str, x1: int | None = None, y1: int | None = None, z1: int | None = None,
-                   x2: int | None = None, y2: int | None = None, z2: int | None = None) -> str:
-    """Replace one block (name or full state) with another, in the whole structure or a box.
+                   x2: int | None = None, y2: int | None = None, z2: int | None = None, region: str | None = None) -> str:
+    """Replace one block (name or full state) with another, in the whole structure, a box or a named region.
     A bare name (e.g. 'stone_bricks') matches every state of that block."""
     s = get(name)
     s.snapshot()
     want = normalize_state(old)
     bare = "[" not in old
-    box = _box(x1, y1, z1, x2, y2, z2) if x1 is not None else None
+    box = _region(s, region) if region else _box(x1, y1, z1, x2, y2, z2) if x1 is not None else None
     n = 0
     for p, st in list(s.blocks.items()):
         if box and not all(box[0][i] <= p[i] <= box[1][i] for i in range(3)):
@@ -210,6 +210,67 @@ def undo(name: str) -> str:
     return "Undone." if get(name).undo() else "Nothing to undo."
 
 
+# ------------------------------------------------------------------ regions
+def _region(s: Structure, region: str):
+    if region not in s.regions:
+        raise ValueError(f"No region '{region}'. Regions: {sorted(s.regions) or '-'} (mark one with mark_region)")
+    return s.regions[region]
+
+
+@mcp.tool()
+def mark_region(name: str, region: str, x1: int, y1: int, z1: int, x2: int, y2: int, z2: int) -> str:
+    """Name a box ('roof', 'stairwell', 'east_wing') so you can fix that part alone later: render it,
+    check it, clear and rebuild it, without reworking the rest. Saved with the structure."""
+    s = get(name)
+    a, b = _box(x1, y1, z1, x2, y2, z2)
+    if not (s.inside(*a) and s.inside(*b)):
+        raise ValueError(f"The box must be inside the structure (size {s.size}).")
+    s.regions[region] = (a, b)
+    return f"Region '{region}' = {a}..{b}."
+
+
+@mcp.tool()
+def list_regions(name: str) -> str:
+    """The named regions of a structure, with their boxes and block counts."""
+    s = get(name)
+    if not s.regions:
+        return "No regions. Mark one with mark_region."
+    return "\n".join(f"  {n}: {a}..{b}, {len(s.crop((a, b)).blocks)} blocks" for n, (a, b) in s.regions.items())
+
+
+@mcp.tool()
+def delete_region(name: str, region: str) -> str:
+    """Forget a region's name (the blocks stay)."""
+    s = get(name)
+    _region(s, region)
+    del s.regions[region]
+    return f"Region '{region}' removed."
+
+
+@mcp.tool()
+def clear_region(name: str, region: str, state: str = "void") -> str:
+    """Empty a named region (default: void; or "air") so it can be rebuilt — the rest is untouched.
+    undo brings it back."""
+    s = get(name)
+    (ax, ay, az), (bx, by, bz) = _region(s, region)
+    s.snapshot()
+    for x in range(ax, bx + 1):
+        for y in range(ay, by + 1):
+            for z in range(az, bz + 1):
+                s.set(x, y, z, None if state == "void" else state)
+    return f"Cleared region '{region}' ({(bx - ax + 1) * (by - ay + 1) * (bz - az + 1)} positions)."
+
+
+@mcp.tool()
+def render_region(name: str, region: str, view: Literal["se", "sw", "nw", "ne"] = "se", scale: int = 32,
+                  max_size: int = 900) -> Image:
+    """Render one named region on its own (closer than a full render, so details like a roof pitch show)."""
+    s = get(name)
+    yaw = {"se": 0, "sw": 90, "nw": 180, "ne": 270}[view]
+    img = renderer().iso(s.crop(_region(s, region)), scale=max(4, min(scale, 96)), yaw=yaw)
+    return _image(img, f"{name}-{region}-{view}", max_size)
+
+
 # ------------------------------------------------------------------ looking at it
 @mcp.tool()
 def layer_text(name: str, y: int) -> str:
@@ -240,21 +301,19 @@ def layer_text(name: str, y: int) -> str:
 @mcp.tool()
 def check_walkable(name: str, x1: int | None = None, y1: int | None = None, z1: int | None = None,
                    x2: int | None = None, y2: int | None = None, z2: int | None = None,
-                   include_open_sky: bool = False) -> str:
+                   include_open_sky: bool = False, region: str | None = None) -> str:
     """Can a player actually walk it? Checks every stair (something to stand on before the bottom step, head
     room over each step — the ceiling above must be open — and a floor or the next step at the top) and every
-    door (upper half, floor and head room on both sides). Optional box to check one stairwell. Stairs with
+    door (upper half, floor and head room on both sides). Optional box (or named region) to check one stairwell. Stairs with
     nothing above them (roof slopes, outdoor steps) are skipped unless include_open_sky."""
     s = get(name)
-    box = _box(x1, y1, z1, x2, y2, z2) if x1 is not None else None
+    box = _region(s, region) if region else _box(x1, y1, z1, x2, y2, z2) if x1 is not None else None
     problems, n = check(s, box, include_open_sky)
     head = (f"'{name}': checked {n['stairs']} stairs and {n['doors']} doors "
             f"(skipped {n['open_sky']} open-sky and {n['upside_down']} upside-down stairs).")
     if not problems:
         return head + " All walkable."
-    return head + f" {len(problems)} problem(s):
-" + "
-".join(map(str, problems))
+    return head + f" {len(problems)} problem(s):\n" + "\n".join(map(str, problems))
 
 
 @mcp.tool()
