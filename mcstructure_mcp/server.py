@@ -17,6 +17,8 @@ from PIL import Image as PILImage
 from .assets import Assets
 from .render import Renderer
 from .structure import AIR, DATA_VERSIONS, Structure, normalize_state
+from .export import save_schem, to_mcfunction
+from .shapes import Pattern, gable_roof, solid, transform_box
 from .walkable import check
 
 mcp = MCPServer("minecraft-structure-designer")
@@ -128,12 +130,14 @@ def set_blocks(name: str, blocks: list[dict]) -> str:
 
 @mcp.tool()
 def fill(name: str, x1: int, y1: int, z1: int, x2: int, y2: int, z2: int, state: str,
-         mode: Literal["replace", "hollow", "outline", "walls", "keep"] = "replace") -> str:
+         mode: Literal["replace", "hollow", "outline", "walls", "keep"] = "replace", seed: int | None = None) -> str:
     """Fill a box (inclusive corners). Modes: replace = every position; hollow = shell of `state`, inside air;
     outline = shell only, inside untouched; walls = the four vertical sides only; keep = only empty positions.
-    state "void" clears positions."""
+    state "void" clears positions. state can be a weighted mix for natural-looking walls and floors:
+    "stone_bricks*6,cracked_stone_bricks*3,mossy_stone_bricks" (seed makes it repeatable)."""
     s = get(name)
     s.snapshot()
+    pattern = Pattern(state, seed)
     (ax, ay, az), (bx, by, bz) = _box(x1, y1, z1, x2, y2, z2)
     n = 0
     for x in range(ax, bx + 1):
@@ -145,7 +149,7 @@ def fill(name: str, x1: int, y1: int, z1: int, x2: int, y2: int, z2: int, state:
                     continue
                 if mode == "keep" and (x, y, z) in s.blocks:
                     continue
-                st = state if mode != "hollow" or edge else AIR
+                st = pattern.pick() if mode != "hollow" or edge else AIR
                 s.set(x, y, z, None if st == "void" else st)
                 n += 1
     return f"Filled {n} positions in '{name}'."
@@ -155,10 +159,12 @@ def fill(name: str, x1: int, y1: int, z1: int, x2: int, y2: int, z2: int, state:
 def replace_blocks(name: str, old: str, new: str, x1: int | None = None, y1: int | None = None, z1: int | None = None,
                    x2: int | None = None, y2: int | None = None, z2: int | None = None, region: str | None = None) -> str:
     """Replace one block (name or full state) with another, in the whole structure, a box or a named region.
-    A bare name (e.g. 'stone_bricks') matches every state of that block."""
+    A bare name (e.g. 'stone_bricks') matches every state of that block. `new` can be a weighted mix
+    ("cracked_stone_bricks*1,stone_bricks*3") to weather a wall."""
     s = get(name)
     s.snapshot()
     want = normalize_state(old)
+    pattern = Pattern(new)
     bare = "[" not in old
     box = _region(s, region) if region else _box(x1, y1, z1, x2, y2, z2) if x1 is not None else None
     n = 0
@@ -166,7 +172,8 @@ def replace_blocks(name: str, old: str, new: str, x1: int | None = None, y1: int
         if box and not all(box[0][i] <= p[i] <= box[1][i] for i in range(3)):
             continue
         if st == want or bare and st.split("[")[0] == want:
-            s.set(*p, None if new == "void" else new)
+            pick = pattern.pick()
+            s.set(*p, None if pick == "void" else pick)
             n += 1
     return f"Replaced {n} blocks in '{name}'."
 
@@ -208,6 +215,80 @@ def set_block_nbt(name: str, x: int, y: int, z: int, snbt: str) -> str:
 def undo(name: str) -> str:
     """Undo the last edit (up to 30 steps)."""
     return "Undone." if get(name).undo() else "Nothing to undo."
+
+
+# ------------------------------------------------------------------ shaping
+@mcp.tool()
+def transform_region(name: str, op: Literal["cw90", "180", "ccw90", "mirror_x", "mirror_z"], region: str | None = None,
+                     x1: int | None = None, y1: int | None = None, z1: int | None = None,
+                     x2: int | None = None, y2: int | None = None, z2: int | None = None) -> str:
+    """Rotate (seen from above, clockwise = north turns east) or mirror a named region or a box, in place.
+    Stairs, doors, fences, signs, rails and logs turn with it. Build one wing, copy_region it, then mirror the
+    copy for a symmetric house. A 90° turn swaps the box's x and z sides (a named region is updated)."""
+    s = get(name)
+    box = _region(s, region) if region else _box(x1, y1, z1, x2, y2, z2) if x1 is not None else None
+    if box is None:
+        raise ValueError("Give a region or a box.")
+    s.snapshot()
+    new_box = transform_box(s, box, op)
+    if region:
+        s.regions[region] = new_box
+    return f"{op} done: now {new_box[0]}..{new_box[1]}."
+
+
+@mcp.tool()
+def roof_gable(name: str, x1: int, z1: int, x2: int, z2: int, y: int, ridge_axis: Literal["x", "z"],
+               stairs: str = "spruce_stairs", slab: str = "spruce_slab", block: str = "spruce_planks",
+               pitch: float = 1.0, gable: str | None = None, region: str | None = None) -> str:
+    """Build a gable roof over the footprint x1..x2 / z1..z2 starting at height y (usually one above the wall
+    tops; widen the footprint by one on each side for eaves). ridge_axis = the direction the ridge runs.
+    pitch: 1 = stairs (45 deg), 0.5 = slabs (shallow), 2 = stairs on blocks (steep). gable = block to close
+    the triangular end walls. region = also name the roof's box, to fix it later with clear_region."""
+    s = get(name)
+    s.snapshot()
+    n = gable_roof(s, x1, z1, x2, z2, y, ridge_axis, stairs, slab, block, float(pitch), gable)
+    if region:
+        width = (abs(z2 - z1) if ridge_axis == "x" else abs(x2 - x1)) + 1
+        rise = {0.5: (width + 1) // 4, 1.0: (width - 1) // 2, 2.0: width}[float(pitch)]
+        a, b = _box(x1, y, z1, x2, min(y + rise, s.size[1] - 1), z2)
+        s.regions[region] = (a, b)
+    return f"Roof: {n} blocks." + (f" Region '{region}' marked." if region else "")
+
+
+@mcp.tool()
+def shape(name: str, kind: Literal["sphere", "cylinder"], x: int, y: int, z: int, radius: float, state: str,
+          height: int = 1, hollow: bool = False, axis: Literal["x", "y", "z"] = "y", seed: int | None = None) -> str:
+    """A sphere (centre x,y,z) or cylinder (base centre x,y,z, height along axis): domes, towers, tanks,
+    arches. hollow keeps a one-block shell (a hollow cylinder is open-ended). state can be a weighted mix."""
+    s = get(name)
+    s.snapshot()
+    n = solid(s, kind, x, y, z, radius, height, Pattern(state, seed), hollow, axis)
+    return f"{kind}: {n} blocks."
+
+
+# ------------------------------------------------------------------ other formats
+@mcp.tool()
+def export_schem(name: str, path: str | None = None) -> str:
+    """Save as a Sponge .schem (v2) for WorldEdit / FAWE (//schem load) and Litematica. Void positions become
+    air: a .schem cannot leave blocks untouched."""
+    s = get(name)
+    p = Path(path) if path else WORKSPACE / f"{name}.schem"
+    p = p if p.is_absolute() else WORKSPACE / p
+    return f"Saved {save_schem(s, p)}"
+
+
+@mcp.tool()
+def export_mcfunction(name: str, path: str | None = None, skip_air: bool = False) -> str:
+    """Save as a .mcfunction of setblock commands relative to whoever runs it (put it in a datapack, stand at
+    the lowest north-west corner, /function). Chest contents are kept. skip_air leaves existing blocks
+    where the structure has air."""
+    s = get(name)
+    p = Path(path) if path else WORKSPACE / f"{name}.mcfunction"
+    p = p if p.is_absolute() else WORKSPACE / p
+    p.parent.mkdir(parents=True, exist_ok=True)
+    text = to_mcfunction(s, skip_air)
+    p.write_text(text, encoding="utf-8")
+    return f"Saved {p} ({text.count(chr(10)) - 1} commands)."
 
 
 # ------------------------------------------------------------------ regions

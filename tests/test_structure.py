@@ -90,3 +90,47 @@ def test_server_tools_run():
     assert "region 'top'" in server.mark_region("t", "top", 0, 3, 0, 3, 3, 3).lower()
     assert "All walkable" in server.check_walkable("t", region="top")
     assert "Cleared" in server.clear_region("t", "top")
+
+
+def test_turning_states():
+    from mcstructure_mcp.shapes import _CW, _MIRROR, turn_state
+    assert turn_state("minecraft:oak_stairs[facing=north,half=bottom]", _CW) == "minecraft:oak_stairs[facing=east,half=bottom]"
+    assert turn_state("minecraft:rail[shape=north_east]", _CW) == "minecraft:rail[shape=south_east]"
+    assert turn_state("minecraft:oak_log[axis=x]", _CW) == "minecraft:oak_log[axis=z]"
+    door = turn_state("minecraft:oak_door[facing=east,half=lower,hinge=left]", _MIRROR["x"], "x")
+    assert door == "minecraft:oak_door[facing=west,half=lower,hinge=right]"
+
+
+def test_rotate_box_four_times_is_identity():
+    from mcstructure_mcp.shapes import transform_box
+    s = Structure((5, 2, 5))
+    s.set(0, 0, 0, "oak_stairs[facing=north,half=bottom]")
+    s.set(2, 1, 0, "stone")
+    before = dict(s.blocks)
+    box = ((0, 0, 0), (2, 1, 1))
+    for _ in range(4):
+        box = transform_box(s, box, "cw90")
+    assert s.blocks == before
+
+
+def test_mix_and_exports(tmp_path):
+    import nbtlib
+    from mcstructure_mcp.export import save_schem, to_mcfunction
+    from mcstructure_mcp.shapes import Pattern
+    p = Pattern("stone*3,oak_stairs[facing=east,half=bottom]", seed=1)
+    assert {p.pick() for _ in range(50)} == {"stone", "oak_stairs[facing=east,half=bottom]"}
+    s = Structure((3, 2, 3))
+    s.set(1, 0, 1, "chest[facing=north,type=single,waterlogged=false]")
+    s.block_nbt[(1, 0, 1)] = nbtlib.parse_nbt('{Items:[{Slot:0b,id:"minecraft:stone",Count:1b}]}')
+    f = nbtlib.load(save_schem(s, tmp_path / "s.schem"))
+    assert f.root_name == "Schematic" and int(f["Width"]) == 3 and len(f["BlockData"]) == 18
+    assert "setblock ~1 ~0 ~1 minecraft:chest[" in to_mcfunction(s)
+
+
+def test_gable_roof_symmetric():
+    from mcstructure_mcp.shapes import gable_roof
+    s = Structure((5, 4, 5))
+    gable_roof(s, 0, 0, 4, 4, 0, "x", "oak_stairs", "oak_slab", "oak_planks")
+    assert s.get(2, 0, 0) == "minecraft:oak_stairs[facing=south,half=bottom]"
+    assert s.get(2, 0, 4) == "minecraft:oak_stairs[facing=north,half=bottom]"
+    assert s.get(2, 2, 2) == "minecraft:oak_planks"   # the ridge

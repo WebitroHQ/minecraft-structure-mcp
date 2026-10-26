@@ -25,8 +25,12 @@ It handles modded blocks too (point it at a mod's assets). This underground ruin
 | `set_blocks` | place many blocks in one call |
 | `fill` | fill a box: `replace`, `hollow` (shell + air inside), `outline`, `walls`, `keep` |
 | `replace_blocks`, `copy_region`, `set_block_nbt` (chest contents…), `undo` | editing |
+| block mixes | any `fill`, `shape` or `replace_blocks` takes a weighted mix: `stone_bricks*6,cracked_stone_bricks*3,mossy_stone_bricks` |
 | `layer_text` | one layer as a character map with a legend — exact and cheap on tokens |
 | `check_walkable` | can a player walk it? stairs (bottom step, head room through the ceiling, top exit) and doors, with coordinates of every problem |
+| `transform_region` | rotate or mirror a part in place; stairs, doors, fences, rails and signs turn with it (build one wing, copy it, mirror it) |
+| `roof_gable`, `shape` | a gable roof at a chosen pitch (slabs, stairs or steep), spheres and cylinders (domes, towers) |
+| `export_schem`, `export_mcfunction` | a Sponge `.schem` for WorldEdit / Litematica, or setblock commands for a datapack |
 | `mark_region`, `list_regions`, `clear_region`, `render_region`, `delete_region` | name a part (`roof`, `stairwell`) and fix just that part: look at it alone, clear it, rebuild it — the rest stays as it was. `replace_blocks` and `check_walkable` take a `region` too |
 | `render` | isometric view from any corner; `cut_y` hides everything above a height to look inside |
 | `render_layer` | top-down plan of one layer, with a grid and coordinates |
