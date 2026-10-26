@@ -35,6 +35,32 @@ It handles modded blocks too (point it at a mod's assets). This underground ruin
 | `render` | isometric view from any corner; `cut_y` hides everything above a height to look inside |
 | `render_layer` | top-down plan of one layer, with a grid and coordinates |
 
+## Structure Studio (no MCP client needed)
+
+A local web app with the same tools: connect a model with your own API key, describe what you want, and watch
+it build — it plans, builds part by part with computed shapes, renders its own work, critiques it and fixes it.
+Its instructions push for showcase-level detail (curves smoothed with stairs and slabs, material gradients,
+recessed windows, greebling, every signature feature), so big subjects like the Titanic or the Millennium
+Falcon come out as real builds, not boxes.
+
+```bash
+pip install "minecraft-structure-mcp[studio]"
+minecraft-structure-studio            # opens http://127.0.0.1:8790
+```
+
+- **Models:** Claude through the official Anthropic SDK (default `claude-opus-5-5`, effort `xhigh`), or anything
+  OpenAI-compatible: OpenAI, OpenRouter, Groq, Ollama, LM Studio, your own endpoint. Pick a model that supports
+  tool calling and, for the best results, images.
+- **`build_script`:** the model writes short sandboxed Python scripts (no imports, no files, 60 s limit) for
+  hulls, domes, window rows and other computed shapes.
+- **Live preview** from any corner with a height cut, the tool log, a running token/cost estimate, Stop, and
+  downloads as `.nbt`, `.schem` or `.mcfunction`.
+- **Your key stays local:** saved in `~/.minecraft-structure-studio/config.json` and sent only to the provider
+  you chose. The server listens on 127.0.0.1 and refuses requests without the page's per-launch token.
+- **Cost:** a large, detailed build is a long agent run (often 100+ steps). With Claude, old tool results are
+  cleared server-side as the context grows, and the prompt is cached; still, expect a few dollars to tens of
+  dollars for something Titanic-sized at high effort. Lower the effort or the step limit in Settings to spend less.
+
 Renders resolve blockstates and models the way the game does: variants and multipart, parent models, element and
 variant rotations, face culling, grass/foliage/water tints. Blocks the game draws with entity renderers (chests,
 beds, skulls, signs) show as simple placeholder boxes.

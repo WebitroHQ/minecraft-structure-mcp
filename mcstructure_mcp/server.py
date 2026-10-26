@@ -62,8 +62,8 @@ def new_structure(name: str, size_x: int, size_y: int, size_z: int, minecraft_ve
     minecraft_version sets the saved DataVersion: use the OLDEST version you target (newer games upgrade it)."""
     if minecraft_version not in DATA_VERSIONS:
         raise ValueError(f"Known versions: {', '.join(DATA_VERSIONS)}")
-    if min(size_x, size_y, size_z) < 1 or max(size_x, size_y, size_z) > 256:
-        raise ValueError("Each side must be 1..256 (a vanilla structure block saves at most 48).")
+    if min(size_x, size_y, size_z) < 1 or max(size_x, size_y, size_z) > 512:
+        raise ValueError("Each side must be 1..512 (a vanilla structure block saves at most 48; use export_schem for more).")
     STRUCTURES[name] = Structure((size_x, size_y, size_z), DATA_VERSIONS[minecraft_version])
     return f"Created '{name}' {size_x}x{size_y}x{size_z} (DataVersion {DATA_VERSIONS[minecraft_version]})."
 

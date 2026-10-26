@@ -134,3 +134,52 @@ def test_gable_roof_symmetric():
     assert s.get(2, 0, 0) == "minecraft:oak_stairs[facing=south,half=bottom]"
     assert s.get(2, 0, 4) == "minecraft:oak_stairs[facing=north,half=bottom]"
     assert s.get(2, 2, 2) == "minecraft:oak_planks"   # the ridge
+
+
+def test_studio_tools_and_sandbox():
+    """The Studio's tool list has schemas, build_script builds, and the sandbox refuses escapes."""
+    import pytest
+    from mcstructure_mcp import server
+    from mcstructure_mcp.studio import tools
+    specs = {t["name"]: t for t in tools.tool_specs()}
+    assert {"build_script", "render", "fill"} <= specs.keys()
+    assert specs["fill"]["parameters"]["properties"]["mode"]["enum"][0] == "replace"
+    server.STRUCTURES["sb"] = Structure((10, 10, 10))
+    text, png = tools.call("build_script", {"name": "sb", "code": "for i in range(10):\n    block(i, 0, 0, 'stone')"})
+    assert "placed 10 blocks" in text and png is None
+    for bad in ("import os", "open('x')", "().__class__", "__builtins__"):
+        with pytest.raises(tools.ScriptError):
+            tools.call("build_script", {"name": "sb", "code": bad})
+
+
+def test_studio_agent_loop_with_a_scripted_model():
+    """One full agent run against a fake model: tool calls run, results go back, the run ends."""
+    from mcstructure_mcp.studio import agent as agent_mod
+    from mcstructure_mcp.studio.llm import Call, Reply
+
+    class Fake:
+        def __init__(self):
+            self.n, self.results = 0, []
+
+        def add_user(self, text):
+            pass
+
+        def add_results(self, results):
+            self.results += results
+
+        def turn(self, tools):
+            self.n += 1
+            if self.n == 1:
+                return Reply("plan", [Call("1", "new_structure", {"name": "ag", "size_x": 5, "size_y": 5, "size_z": 5}),
+                                      Call("2", "fill", {"name": "ag", "x1": 0, "y1": 0, "z1": 0, "x2": 4, "y2": 0, "z2": 4,
+                                                         "state": "stone"})], 10, 5, "tool_use")
+            return Reply("done", [], 10, 5, "end_turn")
+
+    a = agent_mod.Agent()
+    fake = Fake()
+    a.chat, a.cfg = fake, {"provider": "anthropic", "model": "m", "api_key": "k", "base_url": None}
+    a.start("build", dict(a.cfg))
+    a.thread.join(10)
+    kinds = [e["kind"] for e in a.events]
+    assert kinds[0] == "user" and "error" not in kinds and a.events[-1]["text"] == "Done."
+    assert a.current == "ag" and a.version == 2 and len(fake.results) == 2 and a.tokens_out == 10

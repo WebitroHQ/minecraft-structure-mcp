@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Structure Studio</title>
+<style>
+:root {
+  --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --line: #2a2f3a; --text: #e6e8ee; --dim: #8b92a3;
+  --accent: #6cc070; --accent2: #4f9a53; --warn: #e0a84a; --err: #e26363; --user: #24324a; --code: #0b0d11;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex; flex-direction: column; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: #3c4352; }
+button.primary { background: var(--accent2); border-color: var(--accent2); color: #fff; font-weight: 600; }
+button.primary:hover { background: var(--accent); }
+button.danger { color: var(--err); }
+button:disabled { opacity: .45; cursor: default; }
+header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.logo { width: 26px; height: 26px; border-radius: 6px; background:
+  linear-gradient(135deg, #6cc070 0 50%, #4a7a3a 50% 100%); box-shadow: inset 0 0 0 2px #2c4a24; }
+header h1 { font-size: 16px; margin: 0; letter-spacing: .2px; }
+.badge { font-size: 12px; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.badge.ok { color: var(--accent); border-color: #2f4a30; }
+.badge.no { color: var(--warn); border-color: #4a3d22; }
+.spacer { flex: 1; }
+main { flex: 1; display: grid; grid-template-columns: minmax(340px, 440px) 1fr; min-height: 0; }
+#chat { display: flex; flex-direction: column; border-right: 1px solid var(--line); min-height: 0; background: var(--panel); }
+#log { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.ev { max-width: 100%; word-wrap: break-word; white-space: pre-wrap; }
+.ev.user { align-self: flex-end; background: var(--user); padding: 8px 12px; border-radius: 12px 12px 2px 12px; max-width: 90%; }
+.ev.assistant { background: var(--panel2); padding: 9px 12px; border-radius: 12px 12px 12px 2px; border: 1px solid var(--line); }
+.ev.tool { font: 12px/1.4 ui-monospace, Consolas, monospace; color: #a8c7a9; padding: 2px 4px; }
+.ev.tool b { color: var(--accent); font-weight: 600; }
+.ev.tool details summary { cursor: pointer; color: var(--dim); }
+.ev.tool pre { background: var(--code); border: 1px solid var(--line); border-radius: 6px; padding: 8px; overflow: auto; max-height: 260px; margin: 4px 0 0; color: #cfd6e4; }
+.ev.result { font: 12px/1.4 ui-monospace, Consolas, monospace; color: var(--dim); padding: 0 4px 4px 16px; border-left: 2px solid var(--line); margin-left: 6px; max-height: 120px; overflow: hidden; }
+.ev.result.err { color: var(--err); border-color: var(--err); }
+.ev.status { align-self: center; font-size: 12px; color: var(--dim); }
+.ev.error { background: #2a1717; border: 1px solid #5a2a2a; color: #ffb3b3; padding: 8px 12px; border-radius: 8px; }
+#empty { color: var(--dim); padding: 6px 2px; }
+#empty h2 { color: var(--text); font-size: 15px; margin: 4px 0 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { font-size: 12px; padding: 5px 10px; border-radius: 999px; }
+#composer { border-top: 1px solid var(--line); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+#msg { width: 100%; min-height: 64px; max-height: 220px; resize: vertical; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; outline: none; }
+#msg:focus { border-color: #3c5a3d; }
+.row { display: flex; gap: 8px; align-items: center; }
+.meta { font-size: 12px; color: var(--dim); }
+#view { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+#toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 6px 11px; background: transparent; }
+.seg button.on { background: var(--panel2); color: var(--accent); }
+#stage { flex: 1; position: relative; overflow: auto; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at center, #1a1e26 0%, #0c0e12 100%); min-height: 0; }
+#preview { max-width: 100%; max-height: 100%; image-rendering: auto; display: none; }
+#placeholder { color: var(--dim); text-align: center; padding: 30px; }
+#spinner { position: absolute; top: 12px; right: 14px; font-size: 12px; color: var(--dim); display: none; }
+#info { padding: 8px 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--dim); display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+#info a { color: var(--accent); text-decoration: none; margin-right: 8px; }
+#info a.off { color: var(--dim); pointer-events: none; }
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(520px, 94vw); }
+dialog::backdrop { background: rgba(0,0,0,.55); }
+.dlg { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.dlg h2 { margin: 0; font-size: 17px; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--dim); }
+label input, label select { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: var(--text); font-size: 14px; }
+.check { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
+.hint { font-size: 12px; color: var(--dim); }
+.hint a { color: var(--accent); }
+@media (max-width: 860px) {
+  main { grid-template-columns: 1fr; grid-template-rows: 55vh 1fr; }
+  #chat { border-right: 0; border-bottom: 1px solid var(--line); order: 2; }
+  #view { order: 1; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"></div>
+  <h1>Structure Studio</h1>
+  <span id="conn" class="badge">…</span>
+  <div class="spacer"></div>
+  <span id="usage" class="badge" title="Tokens used in this session (approximate cost ignores cache discounts)">0 tokens</span>
+  <button id="newBtn" title="Start a new conversation (the structure stays open)">New chat</button>
+  <button id="settingsBtn">Settings</button>
+</header>
+<main>
+  <section id="chat">
+    <div id="log">
+      <div id="empty">
+        <h2>Describe what to build.</h2>
+        The model plans it, builds it part by part, looks at renders of its own work and fixes what's off.
+        Big, detailed builds take many steps — watch the preview on the right.
+        <div class="chips">
+          <button class="chip">The Titanic at 1:1 scale, fully detailed: funnels, masts, lifeboats, portholes, propellers</button>
+          <button class="chip">The Millennium Falcon, about 100 blocks across, with hull panelling and every signature part</button>
+          <button class="chip">A gothic cathedral with flying buttresses and a rose window</button>
+          <button class="chip">A cosy two-storey timber house with a furnished interior</button>
+        </div>
+      </div>
+    </div>
+    <div id="composer">
+      <textarea id="msg" placeholder="e.g. Build the Titanic at 1:1 scale, fully detailed…  (Ctrl+Enter to send)"></textarea>
+      <div class="row">
+        <button id="sendBtn" class="primary">Build</button>
+        <button id="stopBtn" class="danger" disabled>Stop</button>
+        <span id="status" class="meta"></span>
+      </div>
+    </div>
+  </section>
+  <section id="view">
+    <div id="toolbar">
+      <div class="seg" id="views">
+        <button data-v="se" class="on" title="Seen from the south-east">SE</button>
+        <button data-v="sw" title="Seen from the south-west">SW</button>
+        <button data-v="nw" title="Seen from the north-west">NW</button>
+        <button data-v="ne" title="Seen from the north-east">NE</button>
+      </div>
+      <label class="check" style="font-size:12px;color:var(--dim)">Cut at height
+        <input id="cut" type="range" min="0" max="1" value="1" style="width:160px">
+        <span id="cutVal">off</span>
+      </label>
+      <div class="spacer"></div>
+      <button id="refreshBtn" title="Render again">↻</button>
+    </div>
+    <div id="stage">
+      <div id="placeholder">No structure yet.<br>Your build will appear here as it grows.</div>
+      <img id="preview" alt="Isometric render of the current structure">
+      <div id="spinner">rendering…</div>
+    </div>
+    <div id="info">
+      <span id="dims">—</span>
+      <span id="regions"></span>
+      <div class="spacer"></div>
+      <span>Download:
+        <a id="dlNbt" class="off" href="/api/download?fmt=nbt">.nbt</a>
+        <a id="dlSchem" class="off" href="/api/download?fmt=schem">.schem</a>
+        <a id="dlFn" class="off" href="/api/download?fmt=mcfunction">.mcfunction</a>
+      </span>
+    </div>
+  </section>
+</main>
+
+<dialog id="settings">
+  <form method="dialog" class="dlg" id="settingsForm">
+    <h2>Connect a model</h2>
+    <label>Provider
+      <select id="provider">
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="openai">OpenAI</option>
+        <option value="openrouter">OpenRouter</option>
+        <option value="groq">Groq</option>
+        <option value="ollama">Ollama (local)</option>
+        <option value="lmstudio">LM Studio (local)</option>
+        <option value="custom">Other OpenAI-compatible</option>
+      </select>
+    </label>
+    <label id="baseRow">Base URL
+      <input id="baseUrl" placeholder="https://…/v1">
+    </label>
+    <label>Model
+      <input id="model" list="models" autocomplete="off">
+      <datalist id="models"></datalist>
+    </label>
+    <label>API key
+      <input id="apiKey" type="password" autocomplete="off" placeholder="paste your key">
+    </label>
+    <div class="hint" id="keyHint"></div>
+    <label id="effortRow">Effort (more = better builds, more tokens)
+      <select id="effort">
+        <option value="low">low</option><option value="medium">medium</option>
+        <option value="high">high</option><option value="xhigh">xhigh</option><option value="max">max</option>
+      </select>
+    </label>
+    <label class="check" id="visionRow"><input type="checkbox" id="vision"> Model can see images (send renders back to it)</label>
+    <label>Step limit per message
+      <input id="maxSteps" type="number" min="5" max="1000">
+    </label>
+    <div class="hint">Your key is saved only on this computer (~/.minecraft-structure-studio/config.json) and sent only to the provider above.</div>
+    <div class="row" style="justify-content:flex-end">
+      <button value="cancel" formnovalidate>Cancel</button>
+      <button id="saveSettings" class="primary" value="default">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const TOKEN = "__STUDIO_TOKEN__";
+const PRESETS = {
+  anthropic: { base: "", models: ["claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1", "claude-haiku-5-5"],
+               keyUrl: "https://console.anthropic.com/settings/keys" },
+  openai: { base: "https://api.openai.com/v1", models: [], keyUrl: "https://platform.openai.com/api-keys" },
+  openrouter: { base: "https://openrouter.ai/api/v1", models: ["anthropic/claude-opus-5.5"], keyUrl: "https://openrouter.ai/keys" },
+  groq: { base: "https://api.groq.com/openai/v1", models: [], keyUrl: "https://console.groq.com/keys" },
+  ollama: { base: "http://127.0.0.1:11434/v1", models: [], keyUrl: "" },
+  lmstudio: { base: "http://127.0.0.1:1234/v1", models: [], keyUrl: "" },
+  custom: { base: "", models: [], keyUrl: "" },
+};
+// $ per million tokens (input, output) — for a rough running total only
+const PRICES = { "claude-opus-5-5": [4, 20], "claude-sonnet-5-5": [2, 10], "claude-haiku-5-5": [0.1, 0.5], "claude-fable-5-1": [10, 50] };
+
+const $ = (id) => document.getElementById(id);
+let cfg = {}, since = 0, version = -1, view = "se", sizeY = 0, running = false, loadingImg = false, pendingImg = false;
+
+async function api(path, body) {
+  const opt = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json", "X-Studio-Token": TOKEN }, body: JSON.stringify(body) };
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+function providerOf(c) { return c.provider === "anthropic" ? "anthropic" : (c.preset || "custom"); }
+
+function showConn() {
+  const el = $("conn");
+  // Claude needs a key; OpenAI-compatible servers may not (Ollama, LM Studio, a local proxy)
+  if (cfg.api_key_set || (cfg.provider !== "anthropic" && cfg.base_url)) {
+    el.className = "badge ok"; el.textContent = `● ${cfg.model || "no model"}`;
+  } else {
+    el.className = "badge no"; el.textContent = "Not connected — open Settings";
+  }
+}
+
+async function loadConfig() { cfg = await api("/api/config"); showConn(); }
+
+function fillSettings() {
+  const p = providerOf(cfg);
+  $("provider").value = p;
+  $("baseUrl").value = cfg.base_url || PRESETS[p].base;
+  $("model").value = cfg.model || "";
+  $("apiKey").value = "";
+  $("effort").value = cfg.effort || "xhigh";
+  $("vision").checked = cfg.vision !== false;
+  $("maxSteps").value = cfg.max_steps || 300;
+  syncProvider(false);
+}
+
+function syncProvider(changed) {
+  const p = $("provider").value, pre = PRESETS[p];
+  $("baseRow").style.display = p === "anthropic" ? "none" : "";
+  $("effortRow").style.display = p === "anthropic" ? "" : "none";
+  $("visionRow").style.display = p === "anthropic" ? "none" : "";
+  if (changed) { $("baseUrl").value = pre.base; $("model").value = pre.models[0] || ""; }
+  $("models").innerHTML = pre.models.map(m => `<option value="${m}">`).join("");
+  const same = providerOf(cfg) === p;
+  $("keyHint").innerHTML = (same && cfg.api_key_set ? `A key is saved (${cfg.api_key_hint}). Leave empty to keep it. ` : "") +
+    (pre.keyUrl ? `Get a key: <a href="${pre.keyUrl}" target="_blank" rel="noopener">${new URL(pre.keyUrl).host}</a>` :
+     p === "ollama" || p === "lmstudio" ? "Local servers usually need no key. Pick a model that supports tool calling." : "");
+}
+
+$("provider").addEventListener("change", () => syncProvider(true));
+$("settingsBtn").onclick = () => { fillSettings(); $("settings").showModal(); };
+$("saveSettings").onclick = async (e) => {
+  e.preventDefault();
+  const p = $("provider").value;
+  const body = {
+    provider: p === "anthropic" ? "anthropic" : "openai", preset: p,
+    base_url: p === "anthropic" ? "" : $("baseUrl").value.trim(),
+    model: $("model").value.trim(), effort: $("effort").value, vision: $("vision").checked,
+    max_steps: parseInt($("maxSteps").value || "300", 10),
+  };
+  const key = $("apiKey").value.trim();
+  if (key) body.api_key = key;
+  else if (providerOf(cfg) !== p) body.clear_key = true;
+  try { cfg = await api("/api/config", body); showConn(); $("settings").close(); }
+  catch (err) { alert(err.message); }
+};
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function addEvent(ev) {
+  $("empty")?.remove();
+  const d = document.createElement("div");
+  d.className = "ev " + ev.kind;
+  if (ev.kind === "tool") {
+    d.innerHTML = `<b>${esc(ev.tool)}</b> ${esc(ev.text)}` +
+      (ev.code ? `<details><summary>script</summary><pre>${esc(ev.code)}</pre></details>` : "");
+  } else if (ev.kind === "result") {
+    if (ev.error) d.classList.add("err");
+    d.textContent = (ev.image ? "🖼 " : "") + ev.text;
+  } else {
+    d.textContent = ev.text;
+  }
+  if (ev.kind === "status") { document.querySelectorAll(".ev.status").forEach(x => x.remove()); }
+  const log = $("log"), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+  log.appendChild(d);
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
+
+function refreshPreview(force) {
+  if (loadingImg) { pendingImg = true; return; }
+  const cut = $("cut");
+  const cutY = cut.value < sizeY ? cut.value : "";
+  loadingImg = true; $("spinner").style.display = "block";
+  const img = new Image();
+  img.onload = () => {
+    $("preview").src = img.src; $("preview").style.display = "block"; $("placeholder").style.display = "none";
+    done();
+  };
+  img.onerror = done;
+  function done() {
+    loadingImg = false; $("spinner").style.display = "none";
+    if (pendingImg) { pendingImg = false; refreshPreview(); }
+  }
+  img.src = `/api/preview?view=${view}&cut_y=${cutY}&v=${version}&r=${force ? Date.now() : 0}`;
+}
+
+async function poll() {
+  try {
+    const st = await api(`/api/state?since=${since}`);
+    for (const ev of st.events) { addEvent(ev); since = ev.id + 1; }
+    running = st.running;
+    $("sendBtn").disabled = running; $("stopBtn").disabled = !running;
+    $("status").textContent = running ? "working…" : "";
+    const tin = st.tokens_in, tout = st.tokens_out, pr = PRICES[cfg.model];
+    $("usage").textContent = `${((tin + tout) / 1000).toFixed(1)}k tokens` + (pr ? ` · ≈ $${(tin * pr[0] / 1e6 + tout * pr[1] / 1e6).toFixed(2)}` : "");
+    if (st.size) {
+      $("dims").textContent = `${st.structure}: ${st.size.join(" × ")} · ${st.blocks.toLocaleString()} blocks`;
+      $("regions").textContent = st.regions.length ? "parts: " + st.regions.join(", ") : "";
+      if (sizeY !== st.size[1]) { sizeY = st.size[1]; $("cut").max = sizeY; $("cut").value = sizeY; $("cutVal").textContent = "off"; }
+      ["dlNbt", "dlSchem", "dlFn"].forEach(id => $(id).classList.remove("off"));
+      if (st.version !== version) { version = st.version; refreshPreview(); }
+    }
+  } catch (e) { $("status").textContent = "studio not reachable"; }
+  setTimeout(poll, running ? 1000 : 2000);
+}
+
+async function send(text) {
+  text = (text ?? $("msg").value).trim();
+  if (!text) return;
+  try { await api("/api/chat", { message: text }); $("msg").value = ""; running = true; }
+  catch (e) { addEvent({ kind: "error", text: e.message }); if (/Settings/.test(e.message)) $("settingsBtn").click(); }
+}
+
+$("sendBtn").onclick = () => send();
+$("msg").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) send(); });
+$("stopBtn").onclick = () => api("/api/stop", {});
+$("newBtn").onclick = async () => {
+  try { await api("/api/reset", {}); $("log").innerHTML = ""; since = 0; } catch (e) { alert(e.message); }
+};
+document.querySelectorAll(".chip").forEach(c => c.onclick = () => { $("msg").value = c.textContent; $("msg").focus(); });
+document.querySelectorAll("#views button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#views button").forEach(x => x.classList.toggle("on", x === b));
+  view = b.dataset.v; refreshPreview();
+});
+$("cut").addEventListener("input", () => { $("cutVal").textContent = $("cut").value < sizeY ? "y ≤ " + $("cut").value : "off"; });
+$("cut").addEventListener("change", () => refreshPreview());
+$("refreshBtn").onclick = () => refreshPreview(true);
+
+loadConfig().then(() => { if (!cfg.api_key_set && cfg.provider === "anthropic") { fillSettings(); $("settings").showModal(); } });
+poll();
+</script>
+</body>
+</html>

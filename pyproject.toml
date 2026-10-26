@@ -1,6 +1,6 @@
 [project]
 name = "minecraft-structure-mcp"
-version = "0.4.0"
+version = "0.5.0"
 description = "An MCP server for designing Minecraft structures (structure-block .nbt files) with an AI assistant: build, read back, render, save."
 readme = "README.md"
 license = { text = "MIT" }
@@ -9,15 +9,22 @@ authors = [{ name = "Webitro" }]
 keywords = ["minecraft", "mcp", "model-context-protocol", "claude", "structure", "nbt"]
 dependencies = ["mcp>=2.0", "nbtlib>=2.0", "numpy>=1.24", "pillow>=10.0"]
 
+[project.optional-dependencies]
+studio = ["anthropic>=1.0"]
+
 [project.urls]
 Homepage = "https://github.com/WebitroHQ/minecraft-structure-mcp"
 
 [project.scripts]
 minecraft-structure-mcp = "mcstructure_mcp.server:main"
+minecraft-structure-studio = "mcstructure_mcp.studio.app:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["mcstructure_mcp"]
+packages = ["mcstructure_mcp", "mcstructure_mcp.studio"]
+
+[tool.setuptools.package-data]
+"mcstructure_mcp.studio" = ["static/*"]
