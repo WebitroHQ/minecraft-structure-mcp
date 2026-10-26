@@ -43,6 +43,8 @@ Claude Desktop (`claude_desktop_config.json`):
 
 - `MC_CLIENT_JAR` — path to a Minecraft client jar, e.g. `%APPDATA%/.minecraft/versions/1.20.1/1.20.1.jar`.
   If unset, the newest version in your launcher's `versions` folder (or a Fabric Loom cache) is used.
+- `MCSTRUCT_EXTRA_ASSETS` — mod jars or resource folders (containing `assets/`) whose blocks you want to
+  render too, separated by `;` on Windows and `:` elsewhere.
 - `MCSTRUCT_WORKSPACE` — where `.nbt` files and renders go (default `~/minecraft-structures`).
 
 ## Versions

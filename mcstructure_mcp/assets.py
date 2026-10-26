@@ -79,14 +79,32 @@ class Assets:
             raise RuntimeError("No Minecraft client jar found. Set MC_CLIENT_JAR to e.g. "
                                "%APPDATA%/.minecraft/versions/1.20.1/1.20.1.jar")
         self.jar_path = jar
-        self.zip = zipfile.ZipFile(jar)
-        self.names = set(self.zip.namelist())
+        # Sources searched in order: extra mod assets first (MCSTRUCT_EXTRA_ASSETS: jars or folders that contain
+        # an "assets" directory, separated by the OS path separator), then the Minecraft client jar.
+        self.sources: list = []
+        for entry in filter(None, os.environ.get("MCSTRUCT_EXTRA_ASSETS", "").split(os.pathsep)):
+            e = Path(entry)
+            if e.is_dir():
+                self.sources.append(e)
+            elif e.is_file():
+                self.sources.append(zipfile.ZipFile(e))
+        self.sources.append(zipfile.ZipFile(jar))
+        self._zip_names = {id(z): set(z.namelist()) for z in self.sources if isinstance(z, zipfile.ZipFile)}
 
     # ------------------------------------------------------------------ raw files
+    def _read(self, path: str) -> bytes | None:
+        for src in self.sources:
+            if isinstance(src, Path):
+                f = src / path
+                if f.is_file():
+                    return f.read_bytes()
+            elif path in self._zip_names[id(src)]:
+                return src.read(path)
+        return None
+
     def _json(self, path: str):
-        if path not in self.names:
-            return None
-        return json.loads(self.zip.read(path))
+        data = self._read(path)
+        return json.loads(data) if data is not None else None
 
     @staticmethod
     def _ref(ref: str, kind: str) -> str:
@@ -95,10 +113,10 @@ class Assets:
 
     @lru_cache(maxsize=4096)
     def texture(self, ref: str) -> Image.Image | None:
-        path = self._ref(ref, "textures") + ".png"
-        if path not in self.names:
+        data = self._read(self._ref(ref, "textures") + ".png")
+        if data is None:
             return None
-        im = Image.open(io.BytesIO(self.zip.read(path))).convert("RGBA")
+        im = Image.open(io.BytesIO(data)).convert("RGBA")
         if im.height > im.width:          # animated strip: first frame
             im = im.crop((0, 0, im.width, im.width))
         return im
